@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-4.3.xsd
+		http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.3.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+
+<!-- 패키지 안의 모든것 객체로 만든다 -->
+<context:component-scan base-package="study.spring.myapp" />
+<context:component-scan base-package="study.spring.myapp.*" />
+<context:component-scan base-package="study.spring.bye" />
+<context:component-scan base-package="study.spring.bye.*" />
+<context:component-scan base-package="com.kg.myapp" />
+<context:component-scan base-package="com.kg.myapp.*" />
+ <!-- 어노테이션을 통한 aop는 밑의 코드 한줄 넣어주면 된다 -->
+<aop:aspectj-autoproxy />
+
+
+
+<bean id="propertyConfigurer" class="org.jasypt.spring31.properties.EncryptablePropertyPlaceholderConfigurer">
+	<constructor-arg ref="configurationEncryptor" />
+	<property name="locations">
+		<list>
+			<value>classpath:/db/jdbc.properties</value>
+		</list>
+	</property>
+</bean>
+
+<!-- 암호화 -->
+<bean id="configurationEncryptor" 
+class="org.jasypt.encryption.pbe.StandardPBEStringEncryptor">
+	<property name="config" ref="environmentVariableConfiguration"/>
+	<property name="password" value="hr" />
+</bean>
+<bean id="environmentVariableConfiguration"
+class="org.jasypt.encryption.pbe.config.EnvironmentStringPBEConfig">
+	<property name="algorithm" value="PBEWithMD5AndDES" />
+	<property name="passwordEnvName" value="APP_ENCRYPTION_PASSWORD" />
+</bean>
+<!-- namespace에서 꼭 체크해줘야한다 (체크해놓은 모두다)-->
+<!-- jdbc property를 읽어온다 -->
+<!-- classpath는 resource 폴더를 찍은것 -->
+<bean id="dataSource" class="org.apache.commons.dbcp2.BasicDataSource">
+	<property name="driverClassName" value="${jdbc.driverClassName}" />
+	<property name="url" value="${jdbc.url}" />
+	<property name="username" value="${jdbc.username}" />
+	<property name="password" value="${jdbc.password}" />
+</bean>
+
+<!-- preparedstatement, resultset이런거 대신써주는것 -->
+<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+	<property name="dataSource" ref="dataSource" />
+</bean>
+
+<!-- 트랜잭션 걸기위해 트랜잭션매니저 설정 -->
+<bean id="transactionManager"
+class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+	<property name="dataSource" ref="dataSource" />
+</bean>
+
+<!-- 유효성 검증 빈 -->
+<bean id="messageSource"
+class="org.springframework.context.support.ReloadableResourceBundleMessageSource">
+	<property name="defaultEncoding" value="UTF-8" />
+	<property name="basenames">
+		<list>
+			<value>classpath:i18n/hr</value>
+		</list>
+	</property>
+</bean>
+
+<!-- advice는 before,after와 같이 거는 시점을 의미 -->
+<!-- read-only는 보기만하겠다. 즉 간섭 안하겠다. 나머지는 다 트랜잭션 걸겠다 -->
+<tx:advice id="txAdvice" transaction-manager="transactionManager">
+	<tx:attributes>
+		<tx:method name="get*" read-only="true" />
+		<tx:method name="select*" read-only="true"/>
+		<tx:method name="*"/>
+	</tx:attributes>
+</tx:advice>
+<aop:config>
+	<aop:pointcut expression="execution(* com..*Service.*teEmp(..))" id="txPointcut"/>
+	<aop:advisor advice-ref="txAdvice" pointcut-ref="txPointcut"/>
+</aop:config>
+
+</beans>
